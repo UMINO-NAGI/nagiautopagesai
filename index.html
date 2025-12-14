@@ -5,11 +5,28 @@
     <title>NAGI AUTO PAGES AI - Criador de Landing Pages Automático</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Google Identity Services com Client ID REAL -->
+    <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* Estilos temporários para corrigir o layout */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        #app-root {
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
     <div id="app-root">
@@ -22,30 +39,26 @@
                         <span>NAGI AUTO PAGES AI</span>
                     </div>
                     <p class="tagline">Produzido pela NAGI TECHNOLOGY S.A.</p>
-                    <div class="powered-by">
-                        <i class="fas fa-bolt"></i>
-                        <span>IA Generativa para Landing Pages de Alta Conversão</span>
-                    </div>
                 </div>
                 
                 <div class="login-box">
                     <h2>Crie Landing Pages Profissionais em 30 Segundos</h2>
                     <p class="login-description">
-                        Faça login com Google, pague <strong>$10 USD</strong> para 1 mês de acesso e crie páginas ilimitadas para qualquer produto ou serviço.
+                        Faça login com Google, ative seu plano mensal de <strong>$10 USD</strong> e crie páginas ilimitadas.
                     </p>
                     
                     <div class="features-grid">
                         <div class="feature">
                             <i class="fas fa-bolt"></i>
-                            <span>Geração instantânea</span>
+                            <span>Geração IA</span>
                         </div>
                         <div class="feature">
-                            <i class="fas fa-mobile-alt"></i>
-                            <span>100% responsiva</span>
+                            <i class="fas fa-palette"></i>
+                            <span>Design profissional</span>
                         </div>
                         <div class="feature">
-                            <i class="fas fa-shopping-cart"></i>
-                            <span>Pagamento via PayPal</span>
+                            <i class="fab fa-paypal"></i>
+                            <span>Pagamento seguro</span>
                         </div>
                         <div class="feature">
                             <i class="fas fa-calendar-alt"></i>
@@ -53,29 +66,22 @@
                         </div>
                     </div>
                     
-                    <!-- Google Sign-In Button -->
-                    <div class="google-signin-container">
-                        <div id="g_id_onload"
-                             data-client_id="225104795498-n1j744vsopftf38hnf8oecona7eqkojr.apps.googleusercontent.com"
-                             data-context="signin"
-                             data-ux_mode="popup"
-                             data-callback="handleGoogleSignIn"
-                             data-auto_prompt="false">
-                        </div>
-                        <div class="g_id_signin"
-                             data-type="standard"
-                             data-size="large"
-                             data-theme="filled_blue"
-                             data-text="continue_with"
-                             data-shape="pill"
-                             data-logo_alignment="left">
-                        </div>
+                    <!-- Google Sign-In Button SIMPLIFICADO que funciona -->
+                    <div class="google-signin-simple">
+                        <button id="google-signin-btn" class="google-btn">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google">
+                            <span>Continuar com Google</span>
+                        </button>
+                        <p class="dev-note">
+                            <i class="fas fa-info-circle"></i> 
+                            Modo desenvolvimento: O login será simulado para testes locais
+                        </p>
                     </div>
                     
                     <div class="payment-info">
-                        <p><i class="fas fa-lock"></i> Pagamento mensal de $10 USD via PayPal</p>
+                        <p><i class="fas fa-lock"></i> Plano mensal de $10 USD via PayPal</p>
                         <p><i class="fas fa-check-circle"></i> Acesso por 30 dias • Renovação manual</p>
-                        <p><i class="fas fa-shield-alt"></i> 100% seguro • 7 dias de garantia</p>
+                        <p><i class="fas fa-shield-alt"></i> 100% seguro • Código de ativação</p>
                     </div>
                 </div>
                 
@@ -101,25 +107,30 @@
                             <p class="app-subtitle">Criador Automático de Landing Pages</p>
                         </div>
                     </div>
-                    
+                </div>
+                
+                <div class="header-right">
                     <div class="user-status">
                         <div id="user-info" class="user-info">
-                            <img id="user-avatar" alt="Avatar" class="user-avatar">
+                            <div id="user-avatar" class="user-avatar"></div>
                             <div class="user-details">
                                 <span id="user-name" class="user-name"></span>
                                 <span id="user-email" class="user-email"></span>
                             </div>
                         </div>
                         <div class="plan-badge" id="plan-badge">
-                            <!-- Será preenchido pelo JavaScript -->
+                            <i class="fas fa-lock"></i> <span>Plano Inativo</span>
                         </div>
                     </div>
-                </div>
-                
-                <div class="header-actions">
-                    <button id="logout-btn" class="btn-logout">
-                        <i class="fas fa-sign-out-alt"></i> Sair
-                    </button>
+                    
+                    <div class="header-actions">
+                        <button id="payment-btn" class="btn-payment">
+                            <i class="fas fa-shopping-cart"></i> Ativar Plano
+                        </button>
+                        <button id="logout-btn" class="btn-logout">
+                            <i class="fas fa-sign-out-alt"></i> Sair
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -130,7 +141,7 @@
                         <div class="creator-header">
                             <h2><i class="fas fa-magic"></i> Criar Nova Landing Page</h2>
                             <p class="creator-subtitle">
-                                Descreva o que você quer vender e gere uma página de vendas profissional em segundos
+                                Descreva seu produto/serviço e gere uma página de vendas profissional
                             </p>
                         </div>
                         
@@ -179,7 +190,7 @@
                                 </div>
                             </div>
                             
-                            <button id="generate-page-btn" class="btn-generate">
+                            <button id="generate-page-btn" class="btn-generate" disabled>
                                 <i class="fas fa-bolt"></i> Gerar Landing Page
                             </button>
                         </div>
@@ -213,7 +224,7 @@
                         </div>
                         
                         <div class="preview-container">
-                            <div class="preview-device" id="desktop-preview">
+                            <div class="preview-device" id="preview-device">
                                 <div class="landing-page-preview" id="landing-page-content">
                                     <div class="empty-preview">
                                         <i class="fas fa-rocket"></i>
@@ -225,10 +236,10 @@
                         </div>
                         
                         <div class="preview-actions">
-                            <button id="copy-html-btn" class="btn-secondary">
+                            <button id="copy-html-btn" class="btn-secondary" disabled>
                                 <i class="fas fa-code"></i> Copiar HTML
                             </button>
-                            <button id="download-btn" class="btn-secondary">
+                            <button id="download-btn" class="btn-secondary" disabled>
                                 <i class="fas fa-download"></i> Baixar Página
                             </button>
                         </div>
@@ -240,44 +251,50 @@
             <div id="payment-modal" class="modal hidden">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2><i class="fas fa-shopping-cart"></i> Ativar Acesso Completo</h2>
+                        <h2><i class="fas fa-shopping-cart"></i> Ativar Plano Mensal</h2>
                         <button class="close-modal">&times;</button>
                     </div>
                     
                     <div class="modal-body">
-                        <div class="payment-info-card">
-                            <div class="payment-plan">
-                                <h3>Plano Mensal</h3>
-                                <div class="price">$10 <span>USD</span></div>
-                                <p class="price-note">Pagamento mensal • Acesso por 30 dias</p>
+                        <div class="payment-plan">
+                            <div class="price-display">
+                                <div class="price">$10</div>
+                                <div class="price-label">USD / mês</div>
                             </div>
-                            
-                            <div class="payment-methods">
-                                <h4><i class="fas fa-credit-card"></i> Método de Pagamento</h4>
-                                
-                                <!-- Botão PayPal direto -->
-                                <a href="https://www.paypal.com/ncp/payment/QNS8AAHSEPVG8" target="_blank" class="paypal-link-btn">
-                                    <i class="fab fa-paypal"></i> Pagar com PayPal
-                                </a>
-                                
-                                <div class="payment-instructions">
-                                    <p><strong>Após o pagamento:</strong></p>
-                                    <ol>
-                                        <li>Você receberá um código por email do administrador</li>
-                                        <li>Digite o código abaixo para ativar</li>
-                                        <li>Seu plano será ativado por 30 dias</li>
-                                    </ol>
-                                </div>
-                                
-                                <div class="code-activation">
-                                    <h4><i class="fas fa-key"></i> Ativar com Código</h4>
-                                    <input type="text" id="activation-code" placeholder="Digite o código de 6 dígitos" maxlength="6">
-                                    <button id="activate-code-btn" class="btn-activate">
-                                        <i class="fas fa-check"></i> Ativar Acesso
-                                    </button>
-                                    <p id="code-status" class="code-status"></p>
-                                </div>
+                            <div class="plan-features">
+                                <h3>O que você recebe:</h3>
+                                <ul>
+                                    <li><i class="fas fa-check"></i> Geração ilimitada de landing pages</li>
+                                    <li><i class="fas fa-check"></i> Design profissional e responsivo</li>
+                                    <li><i class="fas fa-check"></i> HTML pronto para uso</li>
+                                    <li><i class="fas fa-check"></i> Validade de 30 dias</li>
+                                    <li><i class="fas fa-check"></i> Suporte por email</li>
+                                </ul>
                             </div>
+                        </div>
+                        
+                        <div class="payment-methods">
+                            <h3><i class="fab fa-paypal"></i> Pagamento via PayPal</h3>
+                            <a href="https://www.paypal.com/ncp/payment/QNS8AAHSEPVG8" target="_blank" class="paypal-btn">
+                                <i class="fab fa-paypal"></i> Pagar $10 USD com PayPal
+                            </a>
+                            <p class="payment-note">
+                                Você será redirecionado para a página segura do PayPal
+                            </p>
+                        </div>
+                        
+                        <div class="code-activation">
+                            <h3><i class="fas fa-key"></i> Ativar com Código</h3>
+                            <p class="activation-info">
+                                Após o pagamento, você receberá um código de 6 dígitos por email. Digite-o abaixo:
+                            </p>
+                            <div class="code-input-container">
+                                <input type="text" id="activation-code" placeholder="Digite o código" maxlength="6" pattern="[0-9]{6}">
+                                <button id="activate-code-btn" class="btn-activate">
+                                    <i class="fas fa-check"></i> Ativar
+                                </button>
+                            </div>
+                            <p id="code-status" class="code-status"></p>
                         </div>
                     </div>
                 </div>
@@ -287,19 +304,9 @@
             <footer class="app-footer">
                 <div class="footer-content">
                     <div class="footer-brand">
-                        <i class="fas fa-robot"></i>
-                        <div>
-                            <strong>NAGI AUTO PAGES AI</strong>
-                            <p>Produzido pela NAGI TECHNOLOGY S.A.</p>
-                        </div>
+                        <strong>NAGI AUTO PAGES AI</strong>
+                        <p>Produzido pela NAGI TECHNOLOGY S.A.</p>
                     </div>
-                    
-                    <div class="footer-links">
-                        <a href="#"><i class="fas fa-question-circle"></i> Ajuda</a>
-                        <a href="#"><i class="fas fa-shield-alt"></i> Privacidade</a>
-                        <a href="#"><i class="fas fa-file-contract"></i> Termos</a>
-                    </div>
-                    
                     <div class="footer-signature">
                         UMINO NAGI - I WAS HERE🍀
                     </div>
