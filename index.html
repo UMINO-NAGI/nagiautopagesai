@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>NAGI AUTO PAGES AI - Criador de Landing Pages Automático</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Google Identity Services com seu Client ID -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <!-- PayPal SDK -->
+    <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD" async></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app-root">
+        <!-- Tela de Login -->
+        <div id="login-screen" class="screen active">
+            <div class="login-container">
+                <div class="brand">
+                    <div class="logo">
+                        <i class="fas fa-robot"></i>
+                        <span>NAGI AUTO PAGES AI</span>
+                    </div>
+                    <p class="tagline">Produzido pela NAGI TECHNOLOGY S.A.</p>
+                    <div class="powered-by">
+                        <i class="fas fa-bolt"></i>
+                        <span>IA Generativa para Landing Pages de Alta Conversão</span>
+                    </div>
+                </div>
+                
+                <div class="login-box">
+                    <h2>Crie Landing Pages em 30 Segundos</h2>
+                    <p class="login-description">
+                        Faça login com Google, pague <strong>$10 USD</strong> uma única vez e crie páginas ilimitadas para qualquer produto ou serviço.
+                    </p>
+                    
+                    <div class="features-grid">
+                        <div class="feature">
+                            <i class="fas fa-bolt"></i>
+                            <span>Geração instantânea</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-mobile-alt"></i>
+                            <span>100% responsiva</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span>Pagamento integrado</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-infinity"></i>
+                            <span>Uso ilimitado</span>
+                        </div>
+                    </div>
+                    
+                    <div class="google-signin-container">
+                        <div id="g_id_onload"
+                             data-client_id="225104795498-n1j744vsopftf38hnf8oecona7eqkojr.apps.googleusercontent.com"
+                             data-context="signin"
+                             data-ux_mode="popup"
+                             data-callback="handleGoogleSignIn"
+                             data-auto_prompt="false">
+                        </div>
+                        <div class="g_id_signin"
+                             data-type="standard"
+                             data-size="large"
+                             data-theme="filled_blue"
+                             data-text="continue_with"
+                             data-shape="pill"
+                             data-logo_alignment="left">
+                        </div>
+                    </div>
+                    
+                    <div class="payment-info">
+                        <p><i class="fas fa-lock"></i> Pagamento único de $10 USD via PayPal</p>
+                        <p><i class="fas fa-check-circle"></i> Acesso vitalício • Sem mensalidades</p>
+                        <p><i class="fas fa-shield-alt"></i> 100% seguro • 7 dias de garantia</p>
+                    </div>
+                </div>
+                
+                <footer class="login-footer">
+                    <div class="copyright">
+                        © 2024 NAGI TECHNOLOGY S.A. • Todos os direitos reservados
+                    </div>
+                    <div class="signature">
+                        UMINO NAGI - I WAS HERE🍀
+                    </div>
+                </footer>
+            </div>
+        </div>
+
+        <!-- Tela Principal (após login) -->
+        <div id="main-screen" class="screen">
+            <header class="app-header">
+                <div class="header-left">
+                    <div class="app-brand">
+                        <i class="fas fa-robot"></i>
+                        <div>
+                            <h1>NAGI AUTO PAGES AI</h1>
+                            <p class="app-subtitle">Criador Automático de Landing Pages</p>
+                        </div>
+                    </div>
+                    
+                    <div class="user-status">
+                        <div id="user-info" class="user-info">
+                            <img id="user-avatar" alt="Avatar" class="user-avatar">
+                            <div class="user-details">
+                                <span id="user-name" class="user-name"></span>
+                                <span id="user-email" class="user-email"></span>
+                            </div>
+                        </div>
+                        <div class="plan-badge" id="plan-badge">
+                            <i class="fas fa-crown"></i>
+                            <span>Plano Ativo</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="header-actions">
+                    <button id="logout-btn" class="btn-logout">
+                        <i class="fas fa-sign-out-alt"></i> Sair
+                    </button>
+                </div>
+            </header>
+
+            <main class="app-main">
+                <!-- Seção de Criação -->
+                <section class="creator-section">
+                    <div class="creator-card">
+                        <div class="creator-header">
+                            <h2><i class="fas fa-magic"></i> Criar Nova Landing Page</h2>
+                            <p class="creator-subtitle">
+                                Descreva o que você quer vender e gere uma página de vendas profissional em segundos
+                            </p>
+                        </div>
+                        
+                        <div class="creator-form">
+                            <div class="form-group">
+                                <label for="product-type">
+                                    <i class="fas fa-cube"></i> Tipo de Produto/Serviço
+                                </label>
+                                <select id="product-type">
+                                    <option value="digital">Produto Digital (Ebook, Curso)</option>
+                                    <option value="physical">Produto Físico</option>
+                                    <option value="service">Serviço Profissional</option>
+                                    <option value="software">Software/SaaS</option>
+                                    <option value="consulting">Consultoria</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="product-name">
+                                    <i class="fas fa-tag"></i> Nome do Produto/Serviço
+                                </label>
+                                <input type="text" id="product-name" placeholder="Ex: Curso Avançado de Marketing Digital">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="target-audience">
+                                    <i class="fas fa-users"></i> Público-Alvo
+                                </label>
+                                <input type="text" id="target-audience" placeholder="Ex: Empreendedores, Profissionais de Marketing">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="product-description">
+                                    <i class="fas fa-edit"></i> Descrição Detalhada
+                                </label>
+                                <textarea id="product-description" rows="4" placeholder="Descreva o que você vende, principais benefícios, características únicas..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="page-style">
+                                    <i class="fas fa-palette"></i> Estilo da Página
+                                </label>
+                                <select id="page-style">
+                                    <option value="modern">Moderno & Clean</option>
+                                    <option value="bold">Bold & Impactante</option>
+                                    <option value="elegant">Elegante & Premium</option>
+                                    <option value="minimal">Minimalista</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-features">
+                                <h3><i class="fas fa-check-circle"></i> Inclui automaticamente:</h3>
+                                <div class="features-list">
+                                    <span><i class="fas fa-check"></i> Headline persuasivo</span>
+                                    <span><i class="fas fa-check"></i> Seção de benefícios</span>
+                                    <span><i class="fas fa-check"></i> Call-to-action otimizado</span>
+                                    <span><i class="fas fa-check"></i> Design responsivo</span>
+                                    <span><i class="fas fa-check"></i> Área para depoimentos</span>
+                                    <span><i class="fas fa-check"></i> FAQ automático</span>
+                                </div>
+                            </div>
+                            
+                            <button id="generate-page-btn" class="btn-generate">
+                                <i class="fas fa-bolt"></i> Gerar Landing Page
+                            </button>
+                        </div>
+                        
+                        <div class="creator-stats">
+                            <div class="stat">
+                                <i class="fas fa-file-alt"></i>
+                                <span>Páginas criadas: <strong id="pages-created">0</strong></span>
+                            </div>
+                            <div class="stat">
+                                <i class="fas fa-infinity"></i>
+                                <span>Uso: <strong>Ilimitado</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Seção de Preview -->
+                <section class="preview-section">
+                    <div class="preview-card">
+                        <div class="preview-header">
+                            <h2><i class="fas fa-eye"></i> Preview da Landing Page</h2>
+                            <div class="preview-controls">
+                                <button class="btn-view active" data-view="desktop">
+                                    <i class="fas fa-desktop"></i> Desktop
+                                </button>
+                                <button class="btn-view" data-view="mobile">
+                                    <i class="fas fa-mobile-alt"></i> Mobile
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="preview-container">
+                            <div class="preview-device" id="desktop-preview">
+                                <div class="landing-page-preview" id="landing-page-content">
+                                    <div class="empty-preview">
+                                        <i class="fas fa-rocket"></i>
+                                        <h3>Sua landing page aparecerá aqui</h3>
+                                        <p>Descreva seu produto acima e clique em "Gerar Landing Page"</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="preview-actions">
+                            <button id="copy-html-btn" class="btn-secondary">
+                                <i class="fas fa-code"></i> Copiar HTML
+                            </button>
+                            <button id="download-btn" class="btn-secondary">
+                                <i class="fas fa-download"></i> Baixar Página
+                            </button>
+                            <button id="share-btn" class="btn-primary">
+                                <i class="fas fa-share"></i> Compartilhar
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Seção de Histórico (inicialmente oculta) -->
+                <section id="history-section" class="history-section hidden">
+                    <div class="history-card">
+                        <h2><i class="fas fa-history"></i> Suas Páginas Criadas</h2>
+                        <div id="pages-list" class="pages-list">
+                            <!-- Páginas serão carregadas aqui -->
+                        </div>
+                    </div>
+                </section>
+            </main>
+            
+            <!-- Modal de Pagamento -->
+            <div id="payment-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-shopping-cart"></i> Ativar Acesso Completo</h2>
+                        <button class="close-modal">&times;</button>
+                    </div>
+                    
+                    <div class="modal-body">
+                        <div class="payment-info-card">
+                            <div class="payment-plan">
+                                <h3>Plano Vitalício</h3>
+                                <div class="price">$10 <span>USD</span></div>
+                                <p class="price-note">Pagamento único • Acesso vitalício</p>
+                            </div>
+                            
+                            <div class="payment-methods">
+                                <h4><i class="fas fa-credit-card"></i> Método de Pagamento</h4>
+                                
+                                <div class="method-option active" id="paypal-option">
+                                    <i class="fab fa-paypal"></i>
+                                    <div class="method-info">
+                                        <strong>PayPal</strong>
+                                        <small>Cartão, PayPal ou débito</small>
+                                    </div>
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                
+                                <div id="paypal-button-container"></div>
+                                
+                                <div class="payment-instructions">
+                                    <p><strong>Após o pagamento:</strong></p>
+                                    <ol>
+                                        <li>Você receberá um código por email</li>
+                                        <li>Digite o código abaixo para ativar</li>
+                                        <li>Comece a criar páginas ilimitadas</li>
+                                    </ol>
+                                </div>
+                                
+                                <div class="code-activation">
+                                    <h4><i class="fas fa-key"></i> Ativar com Código</h4>
+                                    <input type="text" id="activation-code" placeholder="Digite o código de 6 dígitos" maxlength="6">
+                                    <button id="activate-code-btn" class="btn-activate">
+                                        <i class="fas fa-check"></i> Ativar Acesso
+                                    </button>
+                                    <p id="code-status" class="code-status"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rodapé Principal -->
+            <footer class="app-footer">
+                <div class="footer-content">
+                    <div class="footer-brand">
+                        <i class="fas fa-robot"></i>
+                        <div>
+                            <strong>NAGI AUTO PAGES AI</strong>
+                            <p>Produzido pela NAGI TECHNOLOGY S.A.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="footer-links">
+                        <a href="#"><i class="fas fa-question-circle"></i> Ajuda</a>
+                        <a href="#"><i class="fas fa-shield-alt"></i> Privacidade</a>
+                        <a href="#"><i class="fas fa-file-contract"></i> Termos</a>
+                        <a href="#"><i class="fas fa-envelope"></i> Contato</a>
+                    </div>
+                    
+                    <div class="footer-signature">
+                        UMINO NAGI - I WAS HERE🍀
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
