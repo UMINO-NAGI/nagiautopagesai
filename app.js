@@ -1,4 +1,14 @@
-// ==================== SISTEMA DE BANCO DE DADOS ====================
+// ==================== CONFIGURAÇÕES ====================
+const CONFIG = {
+    GOOGLE_CLIENT_ID: "225104795498-n1j744vsopftf38hnf8oecona7eqkojr.apps.googleusercontent.com",
+    PAYPAL_LINK: "https://www.paypal.com/ncp/payment/QNS8AAHSEPVG8",
+    PLAN_PRICE: "10.00",
+    CURRENCY: "USD",
+    ADMIN_PASSWORD: "948399692Se@",
+    PLAN_DURATION_DAYS: 30
+};
+
+// ==================== SISTEMA DE BANCO DE DADOS LOCAL ====================
 class Database {
     constructor() {
         this.init();
@@ -15,7 +25,10 @@ class Database {
     saveUser(user) {
         const users = JSON.parse(localStorage.getItem('nagi_users'));
         users[user.id] = {
-            ...user,
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            picture: user.picture,
             createdAt: new Date().toISOString(),
             lastLogin: new Date().toISOString()
         };
@@ -28,10 +41,18 @@ class Database {
         return users[userId];
     }
     
+    updateUserLogin(userId) {
+        const users = JSON.parse(localStorage.getItem('nagi_users'));
+        if (users[userId]) {
+            users[userId].lastLogin = new Date().toISOString();
+            localStorage.setItem('nagi_users', JSON.stringify(users));
+        }
+    }
+    
     savePlan(userId, planData) {
         const plans = JSON.parse(localStorage.getItem('nagi_plans'));
         const expiry = new Date();
-        expiry.setDate(expiry.getDate() + 30); // 30 dias
+        expiry.setDate(expiry.getDate() + CONFIG.PLAN_DURATION_DAYS);
         
         plans[userId] = {
             ...planData,
@@ -68,6 +89,12 @@ class Database {
         return Math.ceil(diff / (1000 * 60 * 60 * 24));
     }
     
+    deletePlan(userId) {
+        const plans = JSON.parse(localStorage.getItem('nagi_plans'));
+        delete plans[userId];
+        localStorage.setItem('nagi_plans', JSON.stringify(plans));
+    }
+    
     savePage(page) {
         const pages = JSON.parse(localStorage.getItem('nagi_pages'));
         pages.push(page);
@@ -86,7 +113,9 @@ class Database {
         codes.push({
             code: code,
             generatedAt: new Date().toISOString(),
-            used: false
+            used: false,
+            usedBy: null,
+            usedAt: null
         });
         localStorage.setItem('nagi_codes', JSON.stringify(codes));
         return code;
@@ -114,6 +143,13 @@ class Database {
         const activeCodes = codes.filter(c => !c.used);
         localStorage.setItem('nagi_codes', JSON.stringify(activeCodes));
     }
+    
+    savePayment(paymentData) {
+        const payments = JSON.parse(localStorage.getItem('nagi_payments'));
+        payments.push(paymentData);
+        localStorage.setItem('nagi_payments', JSON.stringify(payments));
+        return paymentData;
+    }
 }
 
 // ==================== ESTADO DA APLICAÇÃO ====================
@@ -127,9 +163,6 @@ const els = {
         login: document.getElementById('login-screen'),
         main: document.getElementById('main-screen')
     },
-    
-    // Login
-    googleSigninBtn: document.getElementById('google-signin-btn'),
     
     // User info
     userInfo: document.getElementById('user-info'),
@@ -170,26 +203,45 @@ const els = {
     viewButtons: document.querySelectorAll('.btn-view')
 };
 
-// ==================== LOGIN SIMULADO (para desenvolvimento) ====================
-els.googleSigninBtn?.addEventListener('click', function() {
-    // Para desenvolvimento local, simulamos um usuário
-    const demoUser = {
-        id: 'demo_' + Date.now(),
-        name: 'Usuário Demo',
-        email: 'demo@nagitech.com',
-        picture: null
-    };
+// ==================== GOOGLE SIGN-IN HANDLER ====================
+window.handleGoogleSignIn = (response) => {
+    console.log('Google Sign-In response:', response);
     
-    currentUser = db.saveUser(demoUser);
-    checkUserPlan();
-    updateUI();
-    
-    if (!userPlan) {
-        showPaymentModal();
-    } else {
-        showMainScreen();
+    try {
+        const credential = response.credential;
+        
+        // Decodificar o JWT token
+        const payload = JSON.parse(atob(credential.split('.')[1]));
+        
+        currentUser = {
+            id: payload.sub,
+            name: payload.name,
+            email: payload.email,
+            picture: payload.picture
+        };
+        
+        // Salvar usuário no banco de dados
+        db.saveUser(currentUser);
+        db.updateUserLogin(currentUser.id);
+        
+        // Verificar plano do usuário
+        checkUserPlan();
+        
+        // Atualizar interface
+        updateUI();
+        
+        // Se o usuário não tem plano ativo, mostrar modal de pagamento
+        if (!userPlan) {
+            showPaymentModal();
+        } else {
+            showMainScreen();
+        }
+        
+    } catch (error) {
+        console.error('Erro no login Google:', error);
+        showMessage('Erro no login. Tente novamente.', 'error');
     }
-});
+};
 
 // ==================== GERENCIAMENTO DE USUÁRIO ====================
 function checkUserPlan() {
@@ -198,7 +250,8 @@ function checkUserPlan() {
     userPlan = db.getPlan(currentUser.id);
     if (userPlan && !db.isPlanActive(currentUser.id)) {
         userPlan = null;
-        updateUI();
+        db.deletePlan(currentUser.id);
+        showMessage('Seu plano expirou. Renove para continuar.', 'warning');
     }
 }
 
@@ -211,17 +264,18 @@ function updateUI() {
     
     // Avatar
     if (currentUser.picture) {
-        els.userAvatar.style.backgroundImage = `url(${currentUser.picture})`;
-        els.userAvatar.textContent = '';
+        els.userAvatar.src = currentUser.picture;
+        els.userAvatar.style.display = 'block';
     } else {
-        els.userAvatar.style.backgroundImage = '';
-        els.userAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+        // Avatar padrão com inicial
+        els.userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=4f46e5&color=fff&size=45`;
+        els.userAvatar.style.display = 'block';
     }
     
     // Status do plano
     if (userPlan && db.isPlanActive(currentUser.id)) {
         const daysLeft = db.getDaysRemaining(currentUser.id);
-        els.planBadge.innerHTML = '<i class="fas fa-crown"></i> <span>Plano Ativo</span>';
+        els.planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>Plano Ativo (${daysLeft} dias)</span>`;
         els.planBadge.className = 'plan-badge active';
         els.planValidUntil.textContent = new Date(userPlan.expiresAt).toLocaleDateString('pt-BR');
         
@@ -286,7 +340,7 @@ els.generateBtn?.addEventListener('click', function() {
     };
     
     if (!productData.name || !productData.description) {
-        alert('Por favor, preencha o nome e descrição do produto.');
+        showMessage('Por favor, preencha o nome e descrição do produto.', 'error');
         return;
     }
     
@@ -306,8 +360,7 @@ els.generateBtn?.addEventListener('click', function() {
     db.savePage(page);
     updateUI();
     
-    // Feedback
-    alert('✅ Landing page gerada com sucesso!');
+    showMessage('✅ Landing page gerada com sucesso!', 'success');
 });
 
 function generateLandingPageHTML(data) {
@@ -526,19 +579,19 @@ function generateLandingPageHTML(data) {
 els.copyBtn?.addEventListener('click', function() {
     const html = els.landingPageContent.innerHTML;
     if (!html || html.includes('empty-preview')) {
-        alert('Gere uma landing page primeiro!');
+        showMessage('Gere uma landing page primeiro!', 'error');
         return;
     }
     
     navigator.clipboard.writeText(html).then(() => {
-        alert('✅ HTML copiado para a área de transferência!');
+        showMessage('✅ HTML copiado para a área de transferência!', 'success');
     });
 });
 
 els.downloadBtn?.addEventListener('click', function() {
     const html = els.landingPageContent.innerHTML;
     if (!html || html.includes('empty-preview')) {
-        alert('Gere uma landing page primeiro!');
+        showMessage('Gere uma landing page primeiro!', 'error');
         return;
     }
     
@@ -565,7 +618,7 @@ els.downloadBtn?.addEventListener('click', function() {
     a.click();
     URL.revokeObjectURL(url);
     
-    alert('✅ Landing page baixada com sucesso!');
+    showMessage('✅ Landing page baixada com sucesso!', 'success');
 });
 
 // ==================== VIEW CONTROLS ====================
@@ -602,14 +655,24 @@ els.activateCodeBtn?.addEventListener('click', function() {
         // Ativar plano
         userPlan = db.savePlan(currentUser.id, {
             activatedWithCode: code,
-            price: 10,
-            currency: 'USD'
+            price: CONFIG.PLAN_PRICE,
+            currency: CONFIG.CURRENCY
+        });
+        
+        // Registrar pagamento
+        db.savePayment({
+            userId: currentUser.id,
+            code: code,
+            amount: CONFIG.PLAN_PRICE,
+            currency: CONFIG.CURRENCY,
+            date: new Date().toISOString(),
+            status: 'completed'
         });
         
         updateUI();
         hidePaymentModal();
         showMainScreen();
-        alert('✅ Plano ativado com sucesso! Agora você pode criar landing pages por 30 dias.');
+        showMessage('✅ Plano ativado com sucesso! Agora você pode criar landing pages por 30 dias.', 'success');
     } else {
         els.codeStatus.textContent = '❌ Código inválido ou já utilizado';
         els.codeStatus.className = 'code-status';
@@ -623,11 +686,9 @@ els.activationCode?.addEventListener('keypress', function(e) {
 });
 
 // ==================== PAINEL ADMINISTRATIVO ====================
-const ADMIN_PASSWORD = '948399692Se@';
-
 function showAdminPanel() {
     const password = prompt('🔐 PAINEL ADMINISTRATIVO NAGI\n\nDigite a senha de administrador:');
-    if (password !== ADMIN_PASSWORD) {
+    if (password !== CONFIG.ADMIN_PASSWORD) {
         alert('❌ Senha incorreta!');
         return;
     }
@@ -643,6 +704,7 @@ function showAdminPanel() {
     const usedCodes = allCodes.filter(c => c.used);
     const users = JSON.parse(localStorage.getItem('nagi_users'));
     const plans = JSON.parse(localStorage.getItem('nagi_plans'));
+    const pages = JSON.parse(localStorage.getItem('nagi_pages'));
     
     const panel = document.createElement('div');
     panel.style.cssText = `
@@ -686,6 +748,7 @@ function showAdminPanel() {
                     <div style="font-size: 14px; line-height: 2;">
                         <div>👥 Usuários: ${Object.keys(users).length}</div>
                         <div>👑 Planos ativos: ${Object.keys(plans).filter(id => db.isPlanActive(id)).length}</div>
+                        <div>📄 Páginas criadas: ${pages.length}</div>
                         <div>🔑 Códigos ativos: ${activeCodes.length}</div>
                         <div>💰 Códigos usados: ${usedCodes.length}</div>
                     </div>
@@ -706,7 +769,7 @@ function showAdminPanel() {
                     ">
                         ${newCodes.map(code => `<div>${code}</div>`).join('')}
                     </div>
-                    <button onclick="navigator.clipboard.writeText('${newCodes.join('\\n')}').then(() => alert('Códigos copiados!'))" style="
+                    <button onclick="navigator.clipboard.writeText('${newCodes.join('\\n')}').then(() => alert('✅ Códigos copiados!'))" style="
                         width: 100%;
                         background: #10b981;
                         color: white;
@@ -715,14 +778,55 @@ function showAdminPanel() {
                         border-radius: 8px;
                         cursor: pointer;
                     ">
-                        <i class="fas fa-copy"></i> Copiar Todos
+                        <i class="fas fa-copy"></i> Copiar Todos os Códigos
                     </button>
+                </div>
+                
+                <div style="background: #1f2937; padding: 20px; border-radius: 12px;">
+                    <h3 style="color: #f59e0b; margin-top: 0;">
+                        <i class="fas fa-cog"></i> AÇÕES RÁPIDAS
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                        <button onclick="generateMoreCodes()" style="
+                            background: #f59e0b;
+                            color: white;
+                            border: none;
+                            padding: 10px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            text-align: left;
+                        ">
+                            <i class="fas fa-plus-circle"></i> Gerar Mais 5 Códigos
+                        </button>
+                        <button onclick="clearUsedCodes()" style="
+                            background: #ef4444;
+                            color: white;
+                            border: none;
+                            padding: 10px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            text-align: left;
+                        ">
+                            <i class="fas fa-trash"></i> Limpar Códigos Usados
+                        </button>
+                        <button onclick="exportData()" style="
+                            background: #3b82f6;
+                            color: white;
+                            border: none;
+                            padding: 10px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            text-align: left;
+                        ">
+                            <i class="fas fa-download"></i> Exportar Dados
+                        </button>
+                    </div>
                 </div>
             </div>
             
             <div style="background: #1f2937; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
                 <h3 style="color: #8b5cf6; margin-top: 0;">
-                    <i class="fas fa-user-check"></i> USUÁRIOS ATIVOS
+                    <i class="fas fa-user-check"></i> USUÁRIOS COM PLANO ATIVO
                 </h3>
                 <div style="max-height: 300px; overflow-y: auto; margin-top: 15px;">
                     ${Object.keys(plans)
@@ -749,16 +853,70 @@ function showAdminPanel() {
                                             Expira: ${new Date(plan.expiresAt).toLocaleDateString('pt-BR')}
                                         </span>
                                     </div>
+                                    <div style="margin-top: 5px; font-size: 11px; color: #9ca3af;">
+                                        Código: ${plan.activatedWithCode}
+                                    </div>
                                 </div>
                             `;
-                        }).join('') || '<div style="color: #9ca3af; text-align: center; padding: 20px;">Nenhum usuário ativo</div>'
+                        }).join('') || '<div style="color: #9ca3af; text-align: center; padding: 20px;">Nenhum usuário com plano ativo</div>'
                     }
                 </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <h4 style="color: #f59e0b; margin-top: 0;">
+                    <i class="fas fa-info-circle"></i> INSTRUÇÕES PARA ADMINISTRADOR
+                </h4>
+                <ol style="color: #d1d5db; font-size: 14px; line-height: 1.6;">
+                    <li>Após receber o pagamento via PayPal, copie um código da lista "Novos Códigos"</li>
+                    <li>Envie o código de 6 dígitos para o cliente que efetuou o pagamento</li>
+                    <li>O cliente digita o código no site para ativar o plano mensal</li>
+                    <li>O código será marcado como "usado" automaticamente</li>
+                    <li>O plano expira após 30 dias, exigindo novo pagamento</li>
+                    <li>Gere novos códigos conforme a necessidade</li>
+                </ol>
             </div>
         </div>
     `;
     
     document.body.appendChild(panel);
+    
+    // Funções do painel
+    window.generateMoreCodes = function() {
+        for (let i = 0; i < 5; i++) {
+            db.generateCode();
+        }
+        document.body.removeChild(panel);
+        setTimeout(showAdminPanel, 100);
+    };
+    
+    window.clearUsedCodes = function() {
+        if (confirm('Tem certeza que deseja limpar TODOS os códigos usados?')) {
+            db.clearUsedCodes();
+            document.body.removeChild(panel);
+            setTimeout(showAdminPanel, 100);
+        }
+    };
+    
+    window.exportData = function() {
+        const data = {
+            users: users,
+            plans: plans,
+            pages: pages,
+            codes: allCodes,
+            exportedAt: new Date().toISOString()
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `nagi-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        alert('✅ Dados exportados com sucesso!');
+    };
 }
 
 // ==================== ATALHO PARA PAINEL ADMIN ====================
@@ -767,21 +925,67 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault();
         showAdminPanel();
     }
+    
+    // Fechar modal com ESC
+    if (e.key === 'Escape' && !els.paymentModal.classList.contains('hidden')) {
+        hidePaymentModal();
+    }
 });
+
+// ==================== LOGOUT ====================
+els.logoutBtn?.addEventListener('click', showLoginScreen);
+
+// ==================== UTILIDADES ====================
+function showMessage(text, type = 'info') {
+    // Remover mensagens anteriores
+    const existingMessages = document.querySelectorAll('.nagi-message');
+    existingMessages.forEach(msg => msg.remove());
+    
+    const messageEl = document.createElement('div');
+    messageEl.textContent = text;
+    messageEl.className = `nagi-message nagi-message-${type}`;
+    messageEl.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 25px;
+        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
+        color: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        z-index: 9998;
+        animation: fadeIn 0.3s ease;
+        font-weight: 500;
+        max-width: 400px;
+        word-wrap: break-word;
+    `;
+    
+    document.body.appendChild(messageEl);
+    
+    setTimeout(() => {
+        messageEl.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => messageEl.remove(), 300);
+    }, 4000);
+}
+
+// Adicionar animações CSS para mensagens
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-20px); }
+    }
+`;
+document.head.appendChild(style);
 
 // ==================== INICIALIZAÇÃO ====================
 function init() {
     console.log('🚀 NAGI AUTO PAGES AI inicializado');
-    
-    // Event listeners
-    els.logoutBtn?.addEventListener('click', showLoginScreen);
-    
-    // Fechar modal com ESC
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !els.paymentModal.classList.contains('hidden')) {
-            hidePaymentModal();
-        }
-    });
     
     // Verificar se há usuário na sessão anterior
     const lastUser = localStorage.getItem('nagi_last_user');

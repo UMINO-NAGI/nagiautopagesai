@@ -130,54 +130,10 @@ body {
     font-size: 20px;
 }
 
-/* Google Sign-In Button SIMPLIFICADO */
-.google-signin-simple {
+/* Google Sign-In Container */
+.google-signin-container {
     margin: 40px 0;
-}
-
-.google-btn {
-    width: 100%;
-    background: white;
-    border: 1px solid var(--gray-light);
-    border-radius: var(--border-radius);
-    padding: 15px 25px;
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--dark);
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.google-btn:hover {
-    background: #f8f9fa;
-    border-color: var(--primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.google-btn img {
-    width: 20px;
-    height: 20px;
-}
-
-.dev-note {
-    margin-top: 15px;
     text-align: center;
-    font-size: 14px;
-    color: var(--gray);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.dev-note i {
-    color: var(--warning);
 }
 
 .payment-info {
@@ -283,13 +239,8 @@ body {
     width: 45px;
     height: 45px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
+    object-fit: cover;
+    border: 2px solid var(--primary);
 }
 
 .user-details {
@@ -640,7 +591,7 @@ textarea {
     margin-top: 25px;
 }
 
-.btn-primary, .btn-secondary {
+.btn-secondary {
     flex: 1;
     padding: 14px;
     border-radius: var(--border-radius);
@@ -652,20 +603,6 @@ textarea {
     justify-content: center;
     gap: 8px;
     font-size: 15px;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    border: none;
-}
-
-.btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(79, 70, 229, 0.2);
-}
-
-.btn-secondary {
     background: white;
     border: 1px solid var(--gray-light);
     color: var(--dark);
@@ -676,7 +613,7 @@ textarea {
     border-color: var(--primary);
 }
 
-.btn-primary:disabled, .btn-secondary:disabled {
+.btn-secondary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
