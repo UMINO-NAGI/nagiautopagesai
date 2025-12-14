@@ -949,3 +949,47 @@ textarea {
 .hidden {
     display: none !important;
 }
+.paypal-link-btn {
+    display: block;
+    background: #003087;
+    color: white;
+    text-decoration: none;
+    padding: 18px;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 20px 0;
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.paypal-link-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 48, 135, 0.3);
+}
+
+.paypal-link-btn i {
+    font-size: 24px;
+}
+
+.code-status {
+    margin-top: 15px;
+    min-height: 20px;
+    font-size: 14px;
+    text-align: center;
+}
+
+/* Adicionar ao final do CSS existente */
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}

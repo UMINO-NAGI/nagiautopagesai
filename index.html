@@ -5,11 +5,8 @@
     <title>NAGI AUTO PAGES AI - Criador de Landing Pages Automático</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Google Identity Services com seu Client ID -->
+    <!-- Google Identity Services com Client ID REAL -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    
-    <!-- PayPal SDK -->
-    <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD" async></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -32,9 +29,9 @@
                 </div>
                 
                 <div class="login-box">
-                    <h2>Crie Landing Pages em 30 Segundos</h2>
+                    <h2>Crie Landing Pages Profissionais em 30 Segundos</h2>
                     <p class="login-description">
-                        Faça login com Google, pague <strong>$10 USD</strong> uma única vez e crie páginas ilimitadas para qualquer produto ou serviço.
+                        Faça login com Google, pague <strong>$10 USD</strong> para 1 mês de acesso e crie páginas ilimitadas para qualquer produto ou serviço.
                     </p>
                     
                     <div class="features-grid">
@@ -48,14 +45,15 @@
                         </div>
                         <div class="feature">
                             <i class="fas fa-shopping-cart"></i>
-                            <span>Pagamento integrado</span>
+                            <span>Pagamento via PayPal</span>
                         </div>
                         <div class="feature">
-                            <i class="fas fa-infinity"></i>
-                            <span>Uso ilimitado</span>
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>Plano mensal</span>
                         </div>
                     </div>
                     
+                    <!-- Google Sign-In Button -->
                     <div class="google-signin-container">
                         <div id="g_id_onload"
                              data-client_id="225104795498-n1j744vsopftf38hnf8oecona7eqkojr.apps.googleusercontent.com"
@@ -75,8 +73,8 @@
                     </div>
                     
                     <div class="payment-info">
-                        <p><i class="fas fa-lock"></i> Pagamento único de $10 USD via PayPal</p>
-                        <p><i class="fas fa-check-circle"></i> Acesso vitalício • Sem mensalidades</p>
+                        <p><i class="fas fa-lock"></i> Pagamento mensal de $10 USD via PayPal</p>
+                        <p><i class="fas fa-check-circle"></i> Acesso por 30 dias • Renovação manual</p>
                         <p><i class="fas fa-shield-alt"></i> 100% seguro • 7 dias de garantia</p>
                     </div>
                 </div>
@@ -113,8 +111,7 @@
                             </div>
                         </div>
                         <div class="plan-badge" id="plan-badge">
-                            <i class="fas fa-crown"></i>
-                            <span>Plano Ativo</span>
+                            <!-- Será preenchido pelo JavaScript -->
                         </div>
                     </div>
                 </div>
@@ -139,30 +136,10 @@
                         
                         <div class="creator-form">
                             <div class="form-group">
-                                <label for="product-type">
-                                    <i class="fas fa-cube"></i> Tipo de Produto/Serviço
-                                </label>
-                                <select id="product-type">
-                                    <option value="digital">Produto Digital (Ebook, Curso)</option>
-                                    <option value="physical">Produto Físico</option>
-                                    <option value="service">Serviço Profissional</option>
-                                    <option value="software">Software/SaaS</option>
-                                    <option value="consulting">Consultoria</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
                                 <label for="product-name">
                                     <i class="fas fa-tag"></i> Nome do Produto/Serviço
                                 </label>
                                 <input type="text" id="product-name" placeholder="Ex: Curso Avançado de Marketing Digital">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="target-audience">
-                                    <i class="fas fa-users"></i> Público-Alvo
-                                </label>
-                                <input type="text" id="target-audience" placeholder="Ex: Empreendedores, Profissionais de Marketing">
                             </div>
                             
                             <div class="form-group">
@@ -173,6 +150,13 @@
                             </div>
                             
                             <div class="form-group">
+                                <label for="target-audience">
+                                    <i class="fas fa-users"></i> Público-Alvo
+                                </label>
+                                <input type="text" id="target-audience" placeholder="Ex: Empreendedores, Profissionais de Marketing">
+                            </div>
+                            
+                            <div class="form-group">
                                 <label for="page-style">
                                     <i class="fas fa-palette"></i> Estilo da Página
                                 </label>
@@ -180,7 +164,6 @@
                                     <option value="modern">Moderno & Clean</option>
                                     <option value="bold">Bold & Impactante</option>
                                     <option value="elegant">Elegante & Premium</option>
-                                    <option value="minimal">Minimalista</option>
                                 </select>
                             </div>
                             
@@ -207,8 +190,8 @@
                                 <span>Páginas criadas: <strong id="pages-created">0</strong></span>
                             </div>
                             <div class="stat">
-                                <i class="fas fa-infinity"></i>
-                                <span>Uso: <strong>Ilimitado</strong></span>
+                                <i class="fas fa-calendar-alt"></i>
+                                <span>Plano válido até: <strong id="plan-valid-until">--/--/----</strong></span>
                             </div>
                         </div>
                     </div>
@@ -248,19 +231,6 @@
                             <button id="download-btn" class="btn-secondary">
                                 <i class="fas fa-download"></i> Baixar Página
                             </button>
-                            <button id="share-btn" class="btn-primary">
-                                <i class="fas fa-share"></i> Compartilhar
-                            </button>
-                        </div>
-                    </div>
-                </section>
-                
-                <!-- Seção de Histórico (inicialmente oculta) -->
-                <section id="history-section" class="history-section hidden">
-                    <div class="history-card">
-                        <h2><i class="fas fa-history"></i> Suas Páginas Criadas</h2>
-                        <div id="pages-list" class="pages-list">
-                            <!-- Páginas serão carregadas aqui -->
                         </div>
                     </div>
                 </section>
@@ -277,31 +247,25 @@
                     <div class="modal-body">
                         <div class="payment-info-card">
                             <div class="payment-plan">
-                                <h3>Plano Vitalício</h3>
+                                <h3>Plano Mensal</h3>
                                 <div class="price">$10 <span>USD</span></div>
-                                <p class="price-note">Pagamento único • Acesso vitalício</p>
+                                <p class="price-note">Pagamento mensal • Acesso por 30 dias</p>
                             </div>
                             
                             <div class="payment-methods">
                                 <h4><i class="fas fa-credit-card"></i> Método de Pagamento</h4>
                                 
-                                <div class="method-option active" id="paypal-option">
-                                    <i class="fab fa-paypal"></i>
-                                    <div class="method-info">
-                                        <strong>PayPal</strong>
-                                        <small>Cartão, PayPal ou débito</small>
-                                    </div>
-                                    <i class="fas fa-check-circle"></i>
-                                </div>
-                                
-                                <div id="paypal-button-container"></div>
+                                <!-- Botão PayPal direto -->
+                                <a href="https://www.paypal.com/ncp/payment/QNS8AAHSEPVG8" target="_blank" class="paypal-link-btn">
+                                    <i class="fab fa-paypal"></i> Pagar com PayPal
+                                </a>
                                 
                                 <div class="payment-instructions">
                                     <p><strong>Após o pagamento:</strong></p>
                                     <ol>
-                                        <li>Você receberá um código por email</li>
+                                        <li>Você receberá um código por email do administrador</li>
                                         <li>Digite o código abaixo para ativar</li>
-                                        <li>Comece a criar páginas ilimitadas</li>
+                                        <li>Seu plano será ativado por 30 dias</li>
                                     </ol>
                                 </div>
                                 
@@ -334,7 +298,6 @@
                         <a href="#"><i class="fas fa-question-circle"></i> Ajuda</a>
                         <a href="#"><i class="fas fa-shield-alt"></i> Privacidade</a>
                         <a href="#"><i class="fas fa-file-contract"></i> Termos</a>
-                        <a href="#"><i class="fas fa-envelope"></i> Contato</a>
                     </div>
                     
                     <div class="footer-signature">
