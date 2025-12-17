@@ -21,9 +21,46 @@ class Database {
         if (!localStorage.getItem('nagi_payments')) {
             localStorage.setItem('nagi_payments', JSON.stringify([]));
         }
+        if (!localStorage.getItem('nagi_sync_data')) {
+            localStorage.setItem('nagi_sync_data', JSON.stringify({}));
+        }
         if (!localStorage.getItem('nagi_admin_password')) {
             localStorage.setItem('nagi_admin_password', JSON.stringify('948399692Se@'));
         }
+        if (!localStorage.getItem('nagi_device_id')) {
+            localStorage.setItem('nagi_device_id', 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9));
+        }
+    }
+
+    // ========== SISTEMA DE SINCRONIZAÇÃO ==========
+    getSyncData(userId) {
+        const syncData = JSON.parse(localStorage.getItem('nagi_sync_data'));
+        return syncData[userId] || null;
+    }
+
+    setSyncData(userId, data) {
+        const syncData = JSON.parse(localStorage.getItem('nagi_sync_data'));
+        syncData[userId] = {
+            ...data,
+            lastSync: new Date().toISOString(),
+            deviceId: localStorage.getItem('nagi_device_id')
+        };
+        localStorage.setItem('nagi_sync_data', JSON.stringify(syncData));
+    }
+
+    syncPlanToCloud(userId, planData) {
+        const cloudPlans = JSON.parse(localStorage.getItem('nagi_cloud_plans') || '{}');
+        cloudPlans[userId] = {
+            ...planData,
+            syncedAt: new Date().toISOString(),
+            syncedFrom: localStorage.getItem('nagi_device_id')
+        };
+        localStorage.setItem('nagi_cloud_plans', JSON.stringify(cloudPlans));
+    }
+
+    getCloudPlan(userId) {
+        const cloudPlans = JSON.parse(localStorage.getItem('nagi_cloud_plans') || '{}');
+        return cloudPlans[userId] || null;
     }
 
     // ========== USUÁRIOS ==========
@@ -33,7 +70,8 @@ class Database {
             ...user,
             createdAt: new Date().toISOString(),
             lastLogin: new Date().toISOString(),
-            status: 'active'
+            status: 'active',
+            deviceId: localStorage.getItem('nagi_device_id')
         };
         localStorage.setItem('nagi_users', JSON.stringify(users));
         return users[user.id];
@@ -48,6 +86,7 @@ class Database {
         const users = JSON.parse(localStorage.getItem('nagi_users'));
         if (users[userId]) {
             users[userId].lastLogin = new Date().toISOString();
+            users[userId].lastDevice = localStorage.getItem('nagi_device_id');
             localStorage.setItem('nagi_users', JSON.stringify(users));
         }
     }
@@ -67,22 +106,48 @@ class Database {
             userId: userId,
             activatedAt: new Date().toISOString(),
             expiresAt: expiry.toISOString(),
-            status: 'active'
+            status: 'active',
+            deviceId: localStorage.getItem('nagi_device_id'),
+            synced: false
         };
         localStorage.setItem('nagi_plans', JSON.stringify(plans));
+        
+        // Sincronizar com a "nuvem" (localStorage)
+        this.syncPlanToCloud(userId, plans[userId]);
+        
         return plans[userId];
     }
 
     getPlan(userId) {
         const plans = JSON.parse(localStorage.getItem('nagi_plans'));
+        
+        // Se não tiver plano local, verificar na nuvem
+        if (!plans[userId]) {
+            const cloudPlan = this.getCloudPlan(userId);
+            if (cloudPlan) {
+                // Verificar se o plano da nuvem está ativo
+                const now = new Date();
+                const expiresAt = new Date(cloudPlan.expiresAt);
+                if (now < expiresAt && cloudPlan.status === 'active') {
+                    // Trazer plano da nuvem para local
+                    plans[userId] = cloudPlan;
+                    localStorage.setItem('nagi_plans', JSON.stringify(plans));
+                }
+            }
+        }
+        
         return plans[userId];
     }
 
     updatePlan(userId, updates) {
         const plans = JSON.parse(localStorage.getItem('nagi_plans'));
         if (plans[userId]) {
-            plans[userId] = { ...plans[userId], ...updates };
+            plans[userId] = { ...plans[userId], ...updates, synced: false };
             localStorage.setItem('nagi_plans', JSON.stringify(plans));
+            
+            // Sincronizar com nuvem
+            this.syncPlanToCloud(userId, plans[userId]);
+            
             return plans[userId];
         }
         return null;
@@ -124,7 +189,8 @@ class Database {
             ...pageData,
             id: 'page_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            deviceId: localStorage.getItem('nagi_device_id')
         };
         pages.push(page);
         localStorage.setItem('nagi_pages', JSON.stringify(pages));
@@ -173,7 +239,8 @@ class Database {
             used: false,
             usedBy: null,
             usedAt: null,
-            status: 'active'
+            status: 'active',
+            generatedBy: 'system'
         };
         
         codes.push(codeData);
@@ -233,7 +300,8 @@ class Database {
         const payment = {
             ...paymentData,
             id: 'pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            synced: false
         };
         payments.push(payment);
         localStorage.setItem('nagi_payments', JSON.stringify(payments));
@@ -283,8 +351,10 @@ class Database {
             pages: this.getAllPages(),
             codes: this.getAllCodes(),
             payments: this.getAllPayments(),
+            syncData: JSON.parse(localStorage.getItem('nagi_sync_data')),
+            cloudPlans: JSON.parse(localStorage.getItem('nagi_cloud_plans') || '{}'),
             exportedAt: new Date().toISOString(),
-            version: '1.0.0'
+            version: '2.0.0'
         };
     }
 
@@ -294,7 +364,663 @@ class Database {
         if (data.pages) localStorage.setItem('nagi_pages', JSON.stringify(data.pages));
         if (data.codes) localStorage.setItem('nagi_codes', JSON.stringify(data.codes));
         if (data.payments) localStorage.setItem('nagi_payments', JSON.stringify(data.payments));
+        if (data.syncData) localStorage.setItem('nagi_sync_data', JSON.stringify(data.syncData));
+        if (data.cloudPlans) localStorage.setItem('nagi_cloud_plans', JSON.stringify(data.cloudPlans));
         return true;
+    }
+}
+
+// ==================== SISTEMA DE IA PARA PÁGINAS ====================
+class AIPageGenerator {
+    constructor() {
+        this.apiKey = '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';
+        this.baseURL = 'https://api.openai.com/v1/chat/completions';
+    }
+
+    async generateWithAI(prompt) {
+        try {
+            const response = await fetch(this.baseURL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-3.5-turbo',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'Você é um especialista em criação de landing pages de alta conversão. Responda APENAS com o código HTML completo, sem explicações.'
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 3000
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro na API: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.choices[0].message.content;
+        } catch (error) {
+            console.error('Erro na geração por IA:', error);
+            return null;
+        }
+    }
+
+    generateModernTemplate(productData, audience) {
+        const colorSchemes = {
+            modern: { primary: '#4361ee', secondary: '#3a0ca3', accent: '#f72585', bg: '#f8f9fa' },
+            bold: { primary: '#f59e0b', secondary: '#d97706', accent: '#ef4444', bg: '#1f2937' },
+            elegant: { primary: '#7c3aed', secondary: '#5b21b6', accent: '#db2777', bg: '#f5f3ff' },
+            clean: { primary: '#10b981', secondary: '#059669', accent: '#3b82f6', bg: '#ffffff' }
+        };
+
+        const colors = colorSchemes[productData.style] || colorSchemes.modern;
+        const isDark = productData.style === 'bold';
+
+        return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${productData.name} - Landing Page Profissional</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: ${colors.primary};
+            --secondary: ${colors.secondary};
+            --accent: ${colors.accent};
+            --light: ${isDark ? '#1f2937' : '#f8f9fa'};
+            --dark: ${isDark ? '#f8f9fa' : '#1f2937'};
+            --gray: #6c757d;
+            --gradient: linear-gradient(135deg, ${colors.primary}, ${colors.secondary});
+            --shadow: 0 10px 30px rgba(0,0,0,0.1);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background: var(--light);
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header */
+        .hero-section {
+            background: var(--gradient);
+            color: white;
+            padding: 120px 0 80px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-content {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .hero-content h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        
+        .hero-content p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+        
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--accent);
+            color: white;
+            padding: 18px 40px;
+            border-radius: 50px;
+            font-size: 1.125rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            background: ${colors.accent}dd;
+        }
+        
+        /* Benefits */
+        .benefits-section {
+            padding: 100px 0;
+            background: ${isDark ? '#111827' : 'white'};
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        .section-title h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 15px;
+        }
+        
+        .section-title p {
+            color: var(--gray);
+            font-size: 1.125rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .benefit-card {
+            background: ${isDark ? '#1f2937' : 'white'};
+            padding: 40px 30px;
+            border-radius: 20px;
+            text-align: center;
+            transition: var(--transition);
+            border: 1px solid ${isDark ? '#374151' : '#e9ecef'};
+        }
+        
+        .benefit-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow);
+            border-color: var(--primary);
+        }
+        
+        .benefit-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 25px;
+            color: white;
+            font-size: 32px;
+        }
+        
+        .benefit-card h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--dark);
+        }
+        
+        .benefit-card p {
+            color: var(--gray);
+        }
+        
+        /* Testimonials */
+        .testimonials-section {
+            padding: 100px 0;
+            background: ${isDark ? '#1f2937' : '#f8f9fa'};
+        }
+        
+        .testimonials-slider {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+        
+        .testimonial-card {
+            background: ${isDark ? '#111827' : 'white'};
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+        }
+        
+        .testimonial-text {
+            font-style: italic;
+            font-size: 1.125rem;
+            line-height: 1.8;
+            margin-bottom: 30px;
+            color: var(--dark);
+        }
+        
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .author-avatar {
+            width: 60px;
+            height: 60px;
+            background: var(--gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+        
+        .author-info h4 {
+            font-size: 1.125rem;
+            margin-bottom: 5px;
+            color: var(--dark);
+        }
+        
+        .author-info p {
+            color: var(--gray);
+            font-size: 0.875rem;
+        }
+        
+        /* FAQ */
+        .faq-section {
+            padding: 100px 0;
+            background: ${isDark ? '#111827' : 'white'};
+        }
+        
+        .faq-container {
+            max-width: 800px;
+            margin: 50px auto 0;
+        }
+        
+        .faq-item {
+            margin-bottom: 20px;
+            border: 1px solid ${isDark ? '#374151' : '#e9ecef'};
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .faq-question {
+            padding: 25px 30px;
+            background: ${isDark ? '#1f2937' : '#f8f9fa'};
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1.125rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--dark);
+        }
+        
+        .faq-answer {
+            padding: 0 30px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .faq-item.active .faq-answer {
+            padding: 30px;
+            max-height: 500px;
+        }
+        
+        /* Final CTA */
+        .final-cta-section {
+            padding: 100px 0;
+            background: var(--gradient);
+            color: white;
+            text-align: center;
+        }
+        
+        .final-cta-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .final-cta-content h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+        }
+        
+        .final-cta-content p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+        
+        .final-button {
+            background: white;
+            color: var(--primary);
+            padding: 20px 50px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            border-radius: 50px;
+            text-decoration: none;
+            display: inline-block;
+            transition: var(--transition);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .final-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        /* Footer */
+        .footer-section {
+            background: ${isDark ? '#111827' : '#1f2937'};
+            color: white;
+            padding: 80px 0 40px;
+        }
+        
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+        
+        .footer-logo {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: white;
+        }
+        
+        .footer-description {
+            color: #adb5bd;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+        
+        .footer-bottom {
+            padding-top: 40px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            color: #adb5bd;
+        }
+        
+        .signature {
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 10px;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+            
+            .section-title h2 {
+                font-size: 2rem;
+            }
+            
+            .benefit-card,
+            .testimonial-card {
+                padding: 30px 20px;
+            }
+            
+            .final-cta-content h2 {
+                font-size: 2.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="hero-content">
+                <h1>${productData.name}</h1>
+                <p>${productData.description}</p>
+                <p>Especialmente desenvolvido para ${audience || 'profissionais que buscam resultados extraordinários'}</p>
+                <a href="#cta" class="cta-button">
+                    <i class="fas fa-rocket"></i>
+                    QUERO TRANSFORMAR AGORA
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benefits -->
+    <section class="benefits-section">
+        <div class="container">
+            <div class="section-title">
+                <h2>Benefícios Exclusivos</h2>
+                <p>Descubra tudo o que você vai conquistar com nossa solução</p>
+            </div>
+            
+            <div class="benefits-grid">
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Resultados Comprovados</h3>
+                    <p>Metodologia validada por milhares de casos de sucesso com ROI mensurável.</p>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <h3>Implementação Rápida</h3>
+                    <p>Comece a ver resultados desde o primeiro dia com nosso sistema otimizado.</p>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Garantia Total</h3>
+                    <p>7 dias de garantia incondicional com reembolso 100% do seu investimento.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials-section">
+        <div class="container">
+            <div class="section-title">
+                <h2>O Que Nossos Clientes Dizem</h2>
+                <p>Veja as histórias de sucesso de quem já transformou seu negócio</p>
+            </div>
+            
+            <div class="testimonials-slider">
+                <div class="testimonial-card">
+                    <p class="testimonial-text">
+                        "Esta solução transformou completamente meu negócio. Os resultados foram além das expectativas e o retorno foi imediato!"
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">MS</div>
+                        <div class="author-info">
+                            <h4>Mariana Silva</h4>
+                            <p>Empreendedora Digital</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <p class="testimonial-text">
+                        "A melhor decisão que tomei este ano. O suporte é excepcional e os resultados são visíveis desde a primeira semana."
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">RC</div>
+                        <div class="author-info">
+                            <h4>Roberto Costa</h4>
+                            <p>Consultor de Marketing</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq-section">
+        <div class="container">
+            <div class="section-title">
+                <h2>Perguntas Frequentes</h2>
+                <p>Tire suas dúvidas sobre como funciona</p>
+            </div>
+            
+            <div class="faq-container">
+                <div class="faq-item active">
+                    <div class="faq-question">
+                        <span>Como funciona o processo?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Nosso processo é simples e eficiente: após sua inscrição, você tem acesso imediato a todo o material e suporte. Implementação passo a passo com resultados garantidos.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>Há garantia de resultados?</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Sim! Oferecemos 7 dias de garantia incondicional. Se não estiver satisfeito com os resultados, devolvemos 100% do seu investimento.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section id="cta" class="final-cta-section">
+        <div class="container">
+            <div class="final-cta-content">
+                <h2>Pronto para Transformar Seu Negócio?</h2>
+                <p>Junte-se a milhares de empreendedores de sucesso e dê o próximo passo rumo aos seus objetivos.</p>
+                <a href="#" class="final-button">
+                    <i class="fas fa-crown"></i>
+                    QUERO COMEÇAR AGORA - $10 USD
+                </a>
+                <p style="margin-top: 20px; font-size: 0.875rem; opacity: 0.8;">
+                    <i class="fas fa-lock"></i> Pagamento 100% seguro • 
+                    <i class="fas fa-sync-alt"></i> 7 dias de garantia • 
+                    <i class="fas fa-infinity"></i> Acesso por 30 dias
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer-section">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <div class="footer-logo">${productData.name}</div>
+                    <p class="footer-description">
+                        Solução premium desenvolvida para profissionais que buscam excelência e resultados extraordinários.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; ${new Date().getFullYear()} ${productData.name}. Todos os direitos reservados.</p>
+                <p class="signature">UMINO NAGI - I WAS HERE🍀 • Desenvolvido com ❤️ pela NAGI TECHNOLOGY S.A.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // FAQ Accordion
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const item = question.parentElement;
+                item.classList.toggle('active');
+                
+                const icon = question.querySelector('i');
+                icon.style.transform = item.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+            });
+        });
+        
+        // Smooth Scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+                
+                const target = document.querySelector(targetId);
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>`;
+    }
+
+    generatePageHTML(productData, audience) {
+        const prompt = `
+        Crie uma landing page completa em HTML, CSS e JavaScript para:
+        
+        NOME DO PRODUTO: ${productData.name}
+        DESCRIÇÃO: ${productData.description}
+        PÚBLICO-ALVO: ${audience}
+        ESTILO: ${productData.style}
+        
+        A página deve incluir:
+        1. Design ${productData.style} moderno e profissional
+        2. Copy persuasiva
+        3. Seção de benefícios
+        4. Depoimentos
+        5. FAQ
+        6. Call-to-action claro
+        7. Garantia de 7 dias
+        8. Design 100% responsivo
+        9. Animações sutis
+        10. Formulário de captura opcional
+        
+        Use cores atrativas e tipografia moderna.
+        `;
+
+        // Tentar gerar com IA primeiro
+        return this.generateWithAI(prompt)
+            .then(html => html || this.generateModernTemplate(productData, audience))
+            .catch(() => this.generateModernTemplate(productData, audience));
     }
 }
 
@@ -302,10 +1028,16 @@ class Database {
 class NAGIAutoPages {
     constructor() {
         this.db = new Database();
+        this.aiGenerator = new AIPageGenerator();
         this.currentUser = null;
         this.userPlan = null;
         
-        // Elementos DOM
+        // Inicializar elementos DOM
+        this.initializeElements();
+        this.init();
+    }
+
+    initializeElements() {
         this.elements = {
             screens: {
                 login: document.getElementById('login-screen'),
@@ -376,8 +1108,6 @@ class NAGIAutoPages {
             closeAdminModal: document.querySelector('.close-admin-modal'),
             adminContent: document.getElementById('admin-content')
         };
-        
-        this.init();
     }
 
     init() {
@@ -396,20 +1126,44 @@ class NAGIAutoPages {
     }
 
     // ==================== SESSÃO E AUTENTICAÇÃO ====================
-    checkSession() {
+    async checkSession() {
         const lastUserId = localStorage.getItem('nagi_last_user');
         if (lastUserId) {
             const user = this.db.getUser(lastUserId);
             if (user) {
                 this.currentUser = user;
+                
+                // Verificar plano local primeiro
                 this.userPlan = this.db.getPlan(user.id);
                 
-                // Verificar se o plano expirou
-                if (this.userPlan && !this.db.isPlanActive(user.id)) {
-                    this.userPlan = null;
-                    this.db.deletePlan(user.id);
+                // Se não tiver plano local, verificar na nuvem
+                if (!this.userPlan) {
+                    const cloudPlan = this.db.getCloudPlan(user.id);
+                    if (cloudPlan) {
+                        // Verificar se o plano da nuvem está ativo
+                        const now = new Date();
+                        const expiresAt = new Date(cloudPlan.expiresAt);
+                        if (now < expiresAt && cloudPlan.status === 'active') {
+                            this.userPlan = cloudPlan;
+                            // Salvar localmente
+                            this.db.savePlan(user.id, cloudPlan);
+                        }
+                    }
                 }
                 
+                // Verificar se o plano está ativo
+                if (this.userPlan && !this.db.isPlanActive(user.id)) {
+                    // Verificar na nuvem novamente
+                    const cloudPlan = this.db.getCloudPlan(user.id);
+                    if (cloudPlan && this.db.isPlanActive(user.id)) {
+                        this.userPlan = cloudPlan;
+                    } else {
+                        this.userPlan = null;
+                        this.db.deletePlan(user.id);
+                    }
+                }
+                
+                this.db.updateUserLogin(user.id);
                 this.showMainScreen();
                 this.updateUI();
                 return true;
@@ -423,12 +1177,21 @@ class NAGIAutoPages {
         
         // Salvar usuário
         this.currentUser = this.db.saveUser(user);
+        
+        // Verificar plano
         this.userPlan = this.db.getPlan(user.id);
         
-        // Verificar se o plano expirou
-        if (this.userPlan && !this.db.isPlanActive(user.id)) {
-            this.userPlan = null;
-            this.db.deletePlan(user.id);
+        // Se não tiver plano local, verificar na nuvem
+        if (!this.userPlan) {
+            const cloudPlan = this.db.getCloudPlan(user.id);
+            if (cloudPlan) {
+                const now = new Date();
+                const expiresAt = new Date(cloudPlan.expiresAt);
+                if (now < expiresAt && cloudPlan.status === 'active') {
+                    this.userPlan = cloudPlan;
+                    this.db.savePlan(user.id, cloudPlan);
+                }
+            }
         }
         
         // Salvar último usuário
@@ -626,19 +1389,17 @@ class NAGIAutoPages {
         // Mostrar status de geração
         this.elements.generateBtn.disabled = true;
         this.elements.generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Gerando...</span>';
-        this.elements.statusMessage.textContent = 'Gerando sua landing page profissional...';
+        this.elements.statusMessage.textContent = '🤖 IA criando sua landing page profissional...';
 
         try {
-            // Simular processamento
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Gerar HTML
-            const htmlContent = this.generatePageHTML({
+            // Gerar HTML com IA
+            const productData = {
                 name: productName,
                 description: productDesc,
-                audience: targetAudience,
                 style: pageStyle
-            });
+            };
+            
+            const htmlContent = await this.aiGenerator.generatePageHTML(productData, targetAudience);
 
             // Salvar página
             const page = this.db.savePage({
@@ -675,460 +1436,6 @@ class NAGIAutoPages {
         }
     }
 
-    generatePageHTML(data) {
-        const styles = {
-            modern: { 
-                bg: '#f8fafc', 
-                color: '#1f2937', 
-                accent: '#4f46e5',
-                gradient: 'linear-gradient(135deg, #4f46e5, #8b5cf6)'
-            },
-            bold: { 
-                bg: '#1f2937', 
-                color: '#f9fafb', 
-                accent: '#f59e0b',
-                gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
-            },
-            elegant: { 
-                bg: '#fefce8', 
-                color: '#451a03', 
-                accent: '#d97706',
-                gradient: 'linear-gradient(135deg, #d97706, #92400e)'
-            },
-            clean: { 
-                bg: '#ffffff', 
-                color: '#374151', 
-                accent: '#10b981',
-                gradient: 'linear-gradient(135deg, #10b981, #34d399)'
-            }
-        };
-
-        const style = styles[data.style] || styles.modern;
-        const pageTitle = data.name;
-        const pageDescription = data.description;
-        const audience = data.audience || 'seu público-alvo';
-
-        return `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${pageTitle} - Landing Page Profissional</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: ${style.bg};
-            color: ${style.color};
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-        
-        /* Header */
-        .header {
-            background: ${style.gradient};
-            color: white;
-            padding: 80px 0;
-            text-align: center;
-        }
-        
-        .header h1 {
-            font-size: 48px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            line-height: 1.2;
-        }
-        
-        .header p {
-            font-size: 20px;
-            opacity: 0.9;
-            max-width: 800px;
-            margin: 0 auto 40px;
-        }
-        
-        .cta-button {
-            display: inline-block;
-            background: white;
-            color: ${style.accent};
-            padding: 18px 45px;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: 700;
-            text-decoration: none;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        
-        .cta-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        
-        /* Hero Section */
-        .hero {
-            padding: 100px 0;
-            text-align: center;
-        }
-        
-        .hero h2 {
-            font-size: 42px;
-            margin-bottom: 30px;
-            color: ${style.accent};
-        }
-        
-        .hero p {
-            font-size: 20px;
-            max-width: 800px;
-            margin: 0 auto 50px;
-            color: ${style.color};
-            opacity: 0.9;
-        }
-        
-        /* Benefits */
-        .benefits {
-            background: rgba(0,0,0,0.03);
-            padding: 100px 0;
-        }
-        
-        .benefits h2 {
-            text-align: center;
-            font-size: 36px;
-            margin-bottom: 60px;
-            color: ${style.accent};
-        }
-        
-        .benefits-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-        }
-        
-        .benefit-card {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            transition: transform 0.3s;
-        }
-        
-        .benefit-card:hover {
-            transform: translateY(-10px);
-        }
-        
-        .benefit-icon {
-            width: 80px;
-            height: 80px;
-            background: ${style.gradient};
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 25px;
-            color: white;
-            font-size: 32px;
-        }
-        
-        .benefit-card h3 {
-            font-size: 24px;
-            margin-bottom: 15px;
-            color: ${style.color};
-        }
-        
-        .benefit-card p {
-            color: #6b7280;
-            font-size: 16px;
-        }
-        
-        /* Testimonials */
-        .testimonials {
-            padding: 100px 0;
-        }
-        
-        .testimonials h2 {
-            text-align: center;
-            font-size: 36px;
-            margin-bottom: 60px;
-            color: ${style.accent};
-        }
-        
-        .testimonial-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 30px;
-        }
-        
-        .testimonial-card {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: 1px solid rgba(0,0,0,0.1);
-        }
-        
-        .testimonial-text {
-            font-style: italic;
-            font-size: 18px;
-            margin-bottom: 25px;
-            color: ${style.color};
-        }
-        
-        .testimonial-author {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .author-avatar {
-            width: 50px;
-            height: 50px;
-            background: ${style.gradient};
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-        
-        .author-info h4 {
-            font-size: 18px;
-            margin-bottom: 5px;
-        }
-        
-        .author-info p {
-            color: #6b7280;
-            font-size: 14px;
-        }
-        
-        /* Final CTA */
-        .final-cta {
-            background: ${style.gradient};
-            color: white;
-            padding: 100px 0;
-            text-align: center;
-        }
-        
-        .final-cta h2 {
-            font-size: 42px;
-            margin-bottom: 20px;
-        }
-        
-        .final-cta p {
-            font-size: 20px;
-            opacity: 0.9;
-            max-width: 600px;
-            margin: 0 auto 40px;
-        }
-        
-        .final-button {
-            display: inline-block;
-            background: white;
-            color: ${style.accent};
-            padding: 20px 50px;
-            border-radius: 50px;
-            font-size: 20px;
-            font-weight: 700;
-            text-decoration: none;
-            transition: transform 0.3s;
-        }
-        
-        .final-button:hover {
-            transform: scale(1.05);
-        }
-        
-        /* Footer */
-        .footer {
-            background: ${style.color};
-            color: ${style.bg};
-            padding: 60px 0;
-            text-align: center;
-        }
-        
-        .footer-content {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        
-        .footer-logo {
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            color: ${style.accent};
-        }
-        
-        .footer p {
-            margin-bottom: 20px;
-            opacity: 0.8;
-        }
-        
-        .footer-signature {
-            font-weight: 500;
-            letter-spacing: 0.5px;
-            margin-top: 30px;
-            padding-top: 30px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 36px;
-            }
-            
-            .header p {
-                font-size: 18px;
-            }
-            
-            .hero h2 {
-                font-size: 32px;
-            }
-            
-            .benefits-grid,
-            .testimonial-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .benefit-card,
-            .testimonial-card {
-                padding: 30px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <h1>${pageTitle}</h1>
-            <p>A solução perfeita para ${audience}</p>
-            <a href="#cta" class="cta-button">Quero Começar Agora</a>
-        </div>
-    </header>
-
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <h2>Transforme sua visão em realidade</h2>
-            <p>${pageDescription}</p>
-            <a href="#cta" class="cta-button">Experimente Agora</a>
-        </div>
-    </section>
-
-    <!-- Benefits -->
-    <section class="benefits">
-        <div class="container">
-            <h2>O que você vai receber:</h2>
-            <div class="benefits-grid">
-                <div class="benefit-card">
-                    <div class="benefit-icon">✓</div>
-                    <h3>Resultados Comprovados</h3>
-                    <p>Método testado e aprovado por milhares de clientes satisfeitos.</p>
-                </div>
-                <div class="benefit-card">
-                    <div class="benefit-icon">⚡</div>
-                    <h3>Implementação Rápida</h3>
-                    <p>Comece a ver resultados em menos de 24 horas após o início.</p>
-                </div>
-                <div class="benefit-card">
-                    <div class="benefit-icon">🛡️</div>
-                    <h3>Garantia Total</h3>
-                    <p>7 dias de garantia incondicional ou seu dinheiro de volta.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Testimonials -->
-    <section class="testimonials">
-        <div class="container">
-            <h2>O que nossos clientes dizem:</h2>
-            <div class="testimonial-grid">
-                <div class="testimonial-card">
-                    <p class="testimonial-text">"Esta solução transformou completamente meu negócio. Os resultados foram além das expectativas!"</p>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">MS</div>
-                        <div class="author-info">
-                            <h4>Maria Silva</h4>
-                            <p>Empreendedora Digital</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="testimonial-card">
-                    <p class="testimonial-text">"A melhor decisão que tomei este ano. Retorno garantido e suporte excepcional!"</p>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">JP</div>
-                        <div class="author-info">
-                            <h4>João Pedro</h4>
-                            <p>Consultor de Marketing</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Final CTA -->
-    <section id="cta" class="final-cta">
-        <div class="container">
-            <h2>Pronto para transformar seu negócio?</h2>
-            <p>Junte-se a milhares de empreendedores que já estão colhendo os frutos desta solução.</p>
-            <a href="#" class="final-button">QUERO COMEÇAR AGORA</a>
-            <p style="margin-top: 20px; font-size: 14px; opacity: 0.8;">
-                ⚡ Oferta especial por tempo limitado • 🛡️ 7 dias de garantia
-            </p>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-content">
-            <div class="footer-logo">${pageTitle}</div>
-            <p>© ${new Date().getFullYear()} ${pageTitle}. Todos os direitos reservados.</p>
-            <p>Desenvolvido com ❤️ pela NAGI TECHNOLOGY S.A.</p>
-            <div class="footer-signature">
-                UMINO NAGI - I WAS HERE🍀
-            </div>
-        </div>
-    </footer>
-
-    <script>
-        // Scroll suave para links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
-        
-        // Contador de cliques no CTA
-        const ctaButtons = document.querySelectorAll('.cta-button, .final-button');
-        ctaButtons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                console.log('CTA clicado:', this.textContent);
-            });
-        });
-    </script>
-</body>
-</html>`;
-    }
-
     generateMobileHTML(desktopHTML) {
         // Versão simplificada para mobile
         return desktopHTML.replace(/font-size:\s*\d+px/g, match => {
@@ -1139,13 +1446,20 @@ class NAGIAutoPages {
 
     updatePreview(html) {
         // Extrair apenas o conteúdo do body para preview
-        const bodyContent = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
-        
-        // Atualizar preview desktop
-        this.elements.previewContent.innerHTML = bodyContent;
-        
-        // Atualizar preview mobile
-        this.elements.mobileContent.innerHTML = this.generateMobileHTML(bodyContent);
+        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+        if (bodyMatch) {
+            const bodyContent = bodyMatch[1];
+            
+            // Atualizar preview desktop
+            this.elements.previewContent.innerHTML = bodyContent;
+            
+            // Atualizar preview mobile
+            this.elements.mobileContent.innerHTML = this.generateMobileHTML(bodyContent);
+        } else {
+            // Se não encontrar body, usar o HTML completo
+            this.elements.previewContent.innerHTML = html;
+            this.elements.mobileContent.innerHTML = this.generateMobileHTML(html);
+        }
         
         // Garantir que o preview desktop esteja ativo
         this.switchDeviceView('desktop');
@@ -1274,121 +1588,211 @@ class NAGIAutoPages {
         const allUsers = this.db.getAllUsers();
         const allPlans = this.db.getAllPlans();
 
-        // Gerar 10 novos códigos se necessário
-        if (activeCodes.length < 10) {
-            for (let i = activeCodes.length; i < 10; i++) {
-                this.db.generateCode();
-            }
+        // Gerar novos códigos se necessário
+        if (activeCodes.length < 15) {
+            const needed = 15 - activeCodes.length;
+            this.db.generateMultipleCodes(needed);
         }
 
-        const newCodes = this.db.getActiveCodes().slice(0, 10);
+        const newActiveCodes = this.db.getActiveCodes().slice(0, 12);
 
         this.elements.adminContent.innerHTML = `
-            <div class="admin-stats">
-                <h3><i class="fas fa-chart-bar"></i> Estatísticas do Sistema</h3>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <i class="fas fa-users"></i>
-                        <div>
-                            <span class="stat-number">${stats.users}</span>
-                            <span class="stat-label">Usuários</span>
+            <div class="admin-dashboard">
+                <div class="admin-header">
+                    <h2><i class="fas fa-shield-alt"></i> Painel Administrativo NAGI</h2>
+                    <div class="last-update">Última atualização: ${new Date().toLocaleString('pt-BR')}</div>
+                </div>
+                
+                <div class="admin-stats-grid">
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
                         </div>
+                        <div class="stat-value">${stats.users}</div>
+                        <div class="stat-label">Usuários Cadastrados</div>
                     </div>
-                    <div class="stat-item">
-                        <i class="fas fa-crown"></i>
-                        <div>
-                            <span class="stat-number">${stats.activePlans}</span>
-                            <span class="stat-label">Planos Ativos</span>
+                    
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-crown"></i>
                         </div>
+                        <div class="stat-value">${stats.activePlans}</div>
+                        <div class="stat-label">Planos Ativos</div>
                     </div>
-                    <div class="stat-item">
-                        <i class="fas fa-file-alt"></i>
-                        <div>
-                            <span class="stat-number">${stats.totalPages}</span>
-                            <span class="stat-label">Páginas</span>
+                    
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-file-alt"></i>
                         </div>
+                        <div class="stat-value">${stats.totalPages}</div>
+                        <div class="stat-label">Páginas Criadas</div>
                     </div>
-                    <div class="stat-item">
-                        <i class="fas fa-key"></i>
-                        <div>
-                            <span class="stat-number">${stats.activeCodes}</span>
-                            <span class="stat-label">Códigos Ativos</span>
+                    
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-money-bill-wave"></i>
                         </div>
+                        <div class="stat-value">$ ${stats.revenue.toFixed(2)}</div>
+                        <div class="stat-label">Receita Gerada</div>
                     </div>
                 </div>
-            </div>
-
-            <div class="admin-section">
-                <h3><i class="fas fa-key"></i> Novos Códigos Gerados (10)</h3>
-                <div class="codes-display">
-                    ${newCodes.map(code => `
-                        <div class="code-item">
-                            <span class="code-value">${code.code}</span>
-                            <button onclick="navigator.clipboard.writeText('${code.code}')" class="copy-code-btn">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                        </div>
-                    `).join('')}
-                </div>
-                <button id="copy-all-codes" class="admin-btn">
-                    <i class="fas fa-copy"></i> Copiar Todos os Códigos
-                </button>
-            </div>
-
-            <div class="admin-section">
-                <h3><i class="fas fa-users"></i> Usuários com Plano Ativo</h3>
-                <div class="users-list">
-                    ${Object.entries(allPlans)
-                        .filter(([userId, plan]) => this.db.isPlanActive(userId))
-                        .map(([userId, plan]) => {
-                            const user = allUsers[userId];
-                            const daysLeft = this.db.getDaysRemaining(userId);
-                            return `
-                                <div class="user-item">
-                                    <div class="user-avatar-small" style="background: ${this.getUserColor(userId)}">
-                                        ${user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                                    </div>
-                                    <div class="user-info-admin">
-                                        <strong>${user.name}</strong>
-                                        <small>${user.email}</small>
-                                        <div class="user-plan-info">
-                                            <span class="plan-days">${daysLeft} dias restantes</span>
-                                            <span class="plan-expires">Expira: ${new Date(plan.expiresAt).toLocaleDateString('pt-BR')}</span>
-                                        </div>
-                                    </div>
+                
+                <div class="admin-section">
+                    <div class="admin-section-header">
+                        <h3><i class="fas fa-key"></i> Códigos de Ativação</h3>
+                        <span class="badge">${activeCodes.length} ativos • ${usedCodes.length} usados</span>
+                    </div>
+                    
+                    <div class="codes-grid">
+                        ${newActiveCodes.map(code => `
+                            <div class="code-card">
+                                <div class="code-value">${code.code}</div>
+                                <div class="code-status active">Ativo</div>
+                                <div class="code-actions">
+                                    <button class="code-action-btn copy-code-btn" data-code="${code.code}" title="Copiar">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    <button class="code-action-btn info-code-btn" data-code="${code.code}" title="Informações">
+                                        <i class="fas fa-info"></i>
+                                    </button>
                                 </div>
-                            `;
-                        }).join('') || '<p class="no-data">Nenhum usuário com plano ativo</p>'}
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="admin-actions-bar">
+                        <button class="admin-action-btn" id="generate-more-codes">
+                            <i class="fas fa-plus-circle"></i>
+                            Gerar 15 Novos Códigos
+                        </button>
+                        <button class="admin-action-btn" id="export-codes">
+                            <i class="fas fa-download"></i>
+                            Exportar Códigos
+                        </button>
+                    </div>
                 </div>
-            </div>
-
-            <div class="admin-actions">
-                <button id="generate-more-codes" class="admin-btn">
-                    <i class="fas fa-plus-circle"></i> Gerar Mais 10 Códigos
-                </button>
-                <button id="export-data" class="admin-btn">
-                    <i class="fas fa-download"></i> Exportar Dados
-                </button>
-                <button id="clear-used-codes" class="admin-btn danger">
-                    <i class="fas fa-trash"></i> Limpar Códigos Usados
-                </button>
+                
+                <div class="admin-section">
+                    <div class="admin-section-header">
+                        <h3><i class="fas fa-user-check"></i> Usuários com Plano Ativo</h3>
+                        <span class="badge">${stats.activePlans} ativos</span>
+                    </div>
+                    
+                    ${Object.keys(allPlans).filter(userId => this.db.isPlanActive(userId)).length > 0 ? `
+                        <table class="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Usuário</th>
+                                    <th>Plano</th>
+                                    <th>Expira em</th>
+                                    <th>Páginas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.entries(allPlans)
+                                    .filter(([userId, plan]) => this.db.isPlanActive(userId))
+                                    .map(([userId, plan]) => {
+                                        const user = allUsers[userId];
+                                        const userPages = this.db.getUserPages(userId);
+                                        const daysLeft = this.db.getDaysRemaining(userId);
+                                        return `
+                                            <tr>
+                                                <td>
+                                                    <div class="user-cell">
+                                                        <div class="user-avatar-table" style="background: ${this.getUserColor(userId)}">
+                                                            ${user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                        <div class="user-info-table">
+                                                            <h4>${user.name}</h4>
+                                                            <p>${user.email}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="plan-badge active">Ativo</span>
+                                                </td>
+                                                <td>
+                                                    <strong>${daysLeft} dias</strong><br>
+                                                    <small>${new Date(plan.expiresAt).toLocaleDateString('pt-BR')}</small>
+                                                </td>
+                                                <td>
+                                                    <strong>${userPages.length}</strong> páginas
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                            </tbody>
+                        </table>
+                    ` : `
+                        <div class="no-data">
+                            <i class="fas fa-users-slash fa-2x"></i>
+                            <p>Nenhum usuário com plano ativo</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="admin-section">
+                    <div class="admin-section-header">
+                        <h3><i class="fas fa-cog"></i> Ações do Sistema</h3>
+                    </div>
+                    
+                    <div class="admin-actions-bar">
+                        <button class="admin-action-btn" id="export-all-data">
+                            <i class="fas fa-database"></i>
+                            Exportar Todos os Dados
+                        </button>
+                        <button class="admin-action-btn" id="clear-old-data">
+                            <i class="fas fa-trash"></i>
+                            Limpar Dados Antigos
+                        </button>
+                        <button class="admin-action-btn danger" id="reset-system">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Resetar Sistema
+                        </button>
+                    </div>
+                </div>
             </div>
         `;
 
         // Adicionar event listeners aos botões do admin
-        document.getElementById('copy-all-codes')?.addEventListener('click', () => {
-            const codes = newCodes.map(c => c.code).join('\n');
-            navigator.clipboard.writeText(codes);
-            this.showNotification('✅ Todos os códigos copiados!', 'success');
+        document.querySelectorAll('.copy-code-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const code = btn.dataset.code;
+                navigator.clipboard.writeText(code);
+                this.showNotification(`✅ Código ${code} copiado!`, 'success');
+            });
+        });
+
+        document.querySelectorAll('.info-code-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const code = btn.dataset.code;
+                const codeData = this.db.getCode(code);
+                if (codeData) {
+                    alert(`Código: ${code}\nGerado em: ${new Date(codeData.generatedAt).toLocaleString('pt-BR')}\nStatus: ${codeData.used ? 'Usado' : 'Ativo'}`);
+                }
+            });
         });
 
         document.getElementById('generate-more-codes')?.addEventListener('click', () => {
-            this.db.generateMultipleCodes(10);
+            this.db.generateMultipleCodes(15);
             this.renderAdminPanel();
-            this.showNotification('✅ 10 novos códigos gerados!', 'success');
+            this.showNotification('✅ 15 novos códigos gerados!', 'success');
         });
 
-        document.getElementById('export-data')?.addEventListener('click', () => {
+        document.getElementById('export-codes')?.addEventListener('click', () => {
+            const activeCodes = this.db.getActiveCodes();
+            const codesText = activeCodes.map(c => c.code).join('\n');
+            const blob = new Blob([codesText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nagi-codes-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            this.showNotification('✅ Códigos exportados com sucesso!', 'success');
+        });
+
+        document.getElementById('export-all-data')?.addEventListener('click', () => {
             const data = this.db.exportData();
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -1400,11 +1804,34 @@ class NAGIAutoPages {
             this.showNotification('✅ Dados exportados com sucesso!', 'success');
         });
 
-        document.getElementById('clear-used-codes')?.addEventListener('click', () => {
-            if (confirm('Tem certeza que deseja limpar todos os códigos usados?')) {
+        document.getElementById('clear-old-data')?.addEventListener('click', () => {
+            if (confirm('Deseja limpar todos os códigos usados e páginas antigas?')) {
                 this.db.clearUsedCodes();
+                
+                // Limpar páginas com mais de 30 dias
+                const pages = this.db.getAllPages();
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                
+                const recentPages = pages.filter(page => {
+                    const created = new Date(page.createdAt);
+                    return created > thirtyDaysAgo;
+                });
+                
+                localStorage.setItem('nagi_pages', JSON.stringify(recentPages));
+                
                 this.renderAdminPanel();
-                this.showNotification('✅ Códigos usados removidos!', 'success');
+                this.showNotification('✅ Dados antigos removidos!', 'success');
+            }
+        });
+
+        document.getElementById('reset-system')?.addEventListener('click', () => {
+            if (confirm('⚠️ ATENÇÃO: Isso irá resetar todo o sistema. Todos os dados serão perdidos. Tem certeza?')) {
+                localStorage.clear();
+                this.db.init();
+                this.hideAdminModal();
+                this.showLoginScreen();
+                this.showNotification('✅ Sistema resetado com sucesso!', 'success');
             }
         });
     }
@@ -1558,6 +1985,12 @@ class NAGIAutoPages {
                 }
             });
         });
+
+        // Form submission prevention
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', (e) => e.preventDefault());
+        });
     }
 
     setupKeyboardShortcuts() {
@@ -1571,13 +2004,17 @@ class NAGIAutoPages {
             // Ctrl+Enter para gerar página
             if (e.ctrlKey && e.key === 'Enter') {
                 e.preventDefault();
-                this.generateLandingPage();
+                if (!this.elements.generateBtn.disabled) {
+                    this.generateLandingPage();
+                }
             }
             
             // Ctrl+S para salvar/copiar
             if (e.ctrlKey && e.key === 's') {
                 e.preventDefault();
-                this.copyHTML();
+                if (!this.elements.copyBtn.disabled) {
+                    this.copyHTML();
+                }
             }
         });
     }
@@ -1604,7 +2041,7 @@ window.handleGoogleSignIn = function(response) {
             window.app.handleUserLogin(user);
         } catch (error) {
             console.error('Erro no Google Sign-In:', error);
-            alert('Erro no login. Use o acesso de demonstração.');
+            window.app.handleDemoLogin();
         }
     }
 };

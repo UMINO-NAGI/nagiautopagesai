@@ -597,7 +597,12 @@
                 
             } catch (error) {
                 console.error('Error handling Google Sign-In:', error);
-                alert('Erro no login. Tente novamente ou use o acesso de demonstração.');
+                // Fallback para modo demonstração
+                if (window.app && window.app.handleDemoLogin) {
+                    window.app.handleDemoLogin();
+                } else {
+                    alert('Erro no login. Tente novamente ou use o acesso de demonstração.');
+                }
             }
         };
         
@@ -610,6 +615,14 @@
                     document.getElementById('demo-login-link').style.display = 'block';
                 }
             }, 3000);
+            
+            // Prevenir envio de formulários
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                });
+            });
         });
     </script>
 </body>
